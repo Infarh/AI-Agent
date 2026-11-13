@@ -1,16 +1,53 @@
 import ctypes
 import sys
+import time
 
 import ollama
+
+from agent_tools import get_models, pick_model
 
 if sys.platform == "win32":  # включает ANSI-цвета в консоли Windows
     kernel32 = ctypes.windll.kernel32
     kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
 
 MODEL = "qwen2.5-coder:7b"
+OLLAMA_HOST = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:11434"
 SYSTEM_PROMPT = "Ты — полезный ассистент-программист. Отвечай на русском языке, кратко и по делу."
 GRAY = "\033[90m"
 RESET = "\033[0m"
+
+
+def set_title(text):
+    """Выводит текст в заголовок окна консоли."""
+    if sys.platform == "win32":
+        ctypes.windll.kernel32.SetConsoleTitleW(text)
+    else:
+        print(f"\033]0;{text}\007", end="", flush=True)
+
+
+client = ollama.Client(host=OLLAMA_HOST)
+
+print(f"Ollama: {OLLAMA_HOST}")
+models = get_models(client)
+
+print("Доступные модели:")
+for i, name in enumerate(models, 1):
+    mark = " (по умолчанию)" if name == MODEL else ""
+    print(f"  {i}. {name}{mark}")
+
+for attempt in range(1, 4):
+    choice = input(f"Выберите модель [1-{len(models)}] (Enter — {MODEL}): ")
+    selected = pick_model(models, MODEL, choice)
+    if selected is not None:
+        MODEL = selected
+        break
+    if attempt < 3:
+        print("Неверный номер модели, попробуйте ещё раз.")
+else:
+    print("Три неверных ввода подряд — завершение работы.")
+    sys.exit(1)
+
+print(f"Используется модель: {MODEL}\n")
 
 messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
@@ -25,14 +62,27 @@ while True:
 
     print("Модель: ", end="", flush=True)
     answer = ""
-    for chunk in ollama.chat(model=MODEL, messages=messages, stream=True):
+    tokens = 0
+    start = None
+    for chunk in client.chat(model=MODEL, messages=messages, stream=True):
         message = chunk["message"]
         if message.thinking:
             print(f"{GRAY}{message.thinking}{RESET}", end="", flush=True)
         piece = message.content or ""
         answer += piece
         print(piece, end="", flush=True)
+
+        if message.thinking or piece:
+            if start is None:
+                start = time.perf_counter()
+            tokens += 1
+            elapsed = time.perf_counter() - start
+            if elapsed >= 0.5:
+                set_title(f"{MODEL} — {tokens / elapsed:.1f} ток/с")
+
     print("\n")
+    if chunk.eval_count and chunk.eval_duration:
+        set_title(f"{MODEL} — {chunk.eval_count / (chunk.eval_duration / 1e9):.1f} ток/с")
 
     messages.append({"role": "assistant", "content": answer})
 
