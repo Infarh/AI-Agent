@@ -4,7 +4,14 @@ import time
 
 import ollama
 
-from agent_tools import get_capabilities, get_models, get_system_time, pick_model, run_shell
+from agent_tools import (
+    FILE_TOOLS,
+    get_capabilities,
+    get_models,
+    get_system_time,
+    pick_model,
+    run_shell,
+)
 
 if sys.platform == "win32":  # включает ANSI-цвета в консоли Windows
     kernel32 = ctypes.windll.kernel32
@@ -16,9 +23,9 @@ SYSTEM_PROMPT = "Ты — полезный ассистент-программи
 GRAY = "\033[90m"
 RESET = "\033[0m"
 
-TOOLS = [get_system_time, run_shell]
+TOOLS = [get_system_time, run_shell, *FILE_TOOLS]
 TOOL_FUNCS = {func.__name__: func for func in TOOLS}
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 75
 
 
 def set_title(text):
@@ -59,7 +66,7 @@ messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 while True:
     prompt = input("Вы: ").strip()
-    if prompt in ("/exit", "/quit"):
+    if prompt in ("/exit", "/quit", ""):
         break
     if not prompt:
         continue
