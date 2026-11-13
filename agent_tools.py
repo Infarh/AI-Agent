@@ -3,6 +3,11 @@ def get_models(client):
     return [m.model for m in client.list().models]
 
 
+def get_capabilities(client, model):
+    """Возвращает список возможностей модели (thinking, tools и т.д.)."""
+    return client.show(model).capabilities or []
+
+
 def pick_model(models, default_model, choice):
     """Возвращает выбранную модель по номеру из списка.
 

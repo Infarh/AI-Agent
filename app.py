@@ -4,7 +4,7 @@ import time
 
 import ollama
 
-from agent_tools import get_models, pick_model
+from agent_tools import get_capabilities, get_models, pick_model
 
 if sys.platform == "win32":  # включает ANSI-цвета в консоли Windows
     kernel32 = ctypes.windll.kernel32
@@ -32,8 +32,10 @@ models = get_models(client)
 
 print("Доступные модели:")
 for i, name in enumerate(models, 1):
+    capabilities = get_capabilities(client, name)
+    flags = "".join(f" [{cap}]" for cap in ("thinking", "tools") if cap in capabilities)
     mark = " (по умолчанию)" if name == MODEL else ""
-    print(f"  {i}. {name}{mark}")
+    print(f"  {i}. {name}{flags}{mark}")
 
 for attempt in range(1, 4):
     choice = input(f"Выберите модель [1-{len(models)}] (Enter — {MODEL}): ")
@@ -60,17 +62,29 @@ while True:
 
     messages.append({"role": "user", "content": prompt})
 
-    print("Модель: ", end="", flush=True)
     answer = ""
     tokens = 0
     start = None
+    thinking_started = False
+    answer_started = False
     for chunk in client.chat(model=MODEL, messages=messages, stream=True):
         message = chunk["message"]
-        if message.thinking:
-            print(f"{GRAY}{message.thinking}{RESET}", end="", flush=True)
         piece = message.content or ""
-        answer += piece
-        print(piece, end="", flush=True)
+
+        if message.thinking:
+            if not thinking_started:
+                print("Thinking: ", end="", flush=True)
+                thinking_started = True
+            print(f"{GRAY}{message.thinking}{RESET}", end="", flush=True)
+
+        if piece:
+            if not answer_started:
+                if thinking_started:
+                    print()
+                print("Модель: ", end="", flush=True)
+                answer_started = True
+            answer += piece
+            print(piece, end="", flush=True)
 
         if message.thinking or piece:
             if start is None:
