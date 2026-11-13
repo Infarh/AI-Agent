@@ -18,6 +18,7 @@ RESET = "\033[0m"
 
 TOOLS = [get_system_time, run_shell]
 TOOL_FUNCS = {func.__name__: func for func in TOOLS}
+MAX_TOOL_ROUNDS = 5
 
 
 def set_title(text):
@@ -65,6 +66,7 @@ while True:
 
     messages.append({"role": "user", "content": prompt})
 
+    rounds = 0
     while True:
         answer = ""
         tool_calls = []
@@ -116,6 +118,11 @@ while True:
         messages.append(reply)
 
         if not tool_calls:
+            break
+
+        rounds += 1
+        if rounds > MAX_TOOL_ROUNDS:
+            print(f"{GRAY}Предел вызовов инструментов ({MAX_TOOL_ROUNDS}) достигнут — остановка.{RESET}")
             break
 
         for call in tool_calls:
